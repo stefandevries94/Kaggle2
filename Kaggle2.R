@@ -1,5 +1,3 @@
-setwd("~/Documents/Behavioral Data Science/BDA/Kaggle 2")
-
 library(tidyverse)
 
 dir("physical-activity-recognition/RawData/Train/", pattern = "^acc")
@@ -124,7 +122,7 @@ summary(lda_test)
 Predicted <- as.vector(predicted$class)
 
 
-Full_Test$activity <-  as.vector(predicted$class)
+Full_Test$activity <- as.vector(predicted$class)
 Full_Test %>%
   mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
   unite(Id, user_id, exp_id, sample) %>%
@@ -132,3 +130,21 @@ Full_Test %>%
   write_csv("test_set_predictions.csv")
 
 file.show("test_set_predictions.csv")
+
+
+##### QDA
+qda_test <- qda(activity ~ ., data = Full_Train[, -c(1:3,5,21)])
+predicted <- predict(qda_test, Full_Test)
+summary(qda_test)
+Predicted <- as.vector(predicted$class)
+
+
+Full_Test$activity <- as.vector(predicted$class)
+Full_Test %>%
+  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
+  unite(Id, user_id, exp_id, sample) %>%
+  dplyr::select(Id, Predicted = activity) %>%
+  write_csv("test_set_predictions_qda.csv")
+
+file.show("test_set_predictions.csv")
+
