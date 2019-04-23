@@ -86,12 +86,49 @@ Gyro_data = filenamesGYRO %>%
   map_dfr(extractTimeDomainFeatures) %>% 
   rename_at(vars(-c(epoch, user_id,exp_id, activity, sample, n)), ~ paste0(., "_Gyro"))
 
-Full_Train <- inner_join(Acc_data, Gyro_data)
+Full_Train <- inner_join(Acc_data, Gyro_data) %>% 
+  filter(activity != "-")
 
-Acc_data %>%
-  ggplot(aes(m1_Acc)) + 
+filenamesACC <- dir("physical-activity-recognition/RawData/Test/", "^acc", full.names = TRUE)
+filenamesGYRO <- dir("physical-activity-recognition/RawData/Test/", "^gyro", full.names = TRUE)
+
+Acc_data =  filenamesACC %>%
+  map_dfr(extractTimeDomainFeatures) %>% 
+  rename_at(vars(-c(epoch, user_id,exp_id, activity, sample, n)), ~ paste0(., "_Acc"))
+
+Gyro_data = filenamesGYRO %>% 
+  map_dfr(extractTimeDomainFeatures) %>% 
+  rename_at(vars(-c(epoch, user_id,exp_id, activity, sample, n)), ~ paste0(., "_Gyro"))
+
+Full_Test <- inner_join(Acc_data, Gyro_data)
+
+
+
+
+
+Full_Train %>%
+  ggplot(aes(m1_Gyro)) + 
   geom_histogram(bins=40, fill=1, alpha=0.5) + 
-  geom_histogram(aes(m2_Acc), bins=40, fill = 2, alpha=0.5) + 
-  geom_histogram(aes(m3_Acc), bins=40, fill = 4, alpha=0.5) +
+  geom_histogram(aes(m2_Gyro), bins=40, fill = 2, alpha=0.5) + 
+  geom_histogram(aes(m3_Gyro), bins=40, fill = 4, alpha=0.5) +
   facet_wrap(~activity, scales = "free_y")
 
+
+
+#################################################################################
+# Models
+library(MASS)
+lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,21)])
+predicted <- predict(lda_test, Full_Test)
+summary(lda_test)
+Predicted <- as.vector(predicted$class)
+
+
+Full_Test$activity <-  as.vector(predicted$class)
+Full_Test %>%
+  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
+  unite(Id, user_id, exp_id, sample) %>%
+  dplyr::select(Id, Predicted = activity) %>%
+  write_csv("test_set_predictions.csv")
+
+file.show("test_set_predictions.csv")
