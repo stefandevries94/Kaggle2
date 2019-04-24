@@ -53,9 +53,18 @@ extractTimeDomainFeatures <-
         m1 = mean(X1), 
         m2 = mean(X2),
         m3 = mean(X3),
+        p1 = mean(X1)^2,
+        p2 = mean(X2)^2,
+        p3 = mean(X3)^2,
         sd1 = sd(X1),
         sd2 = sd(X2),
         sd3 = sd(X3),
+        min1 = min(X1),
+        min2 = min(X2),
+        min3 = min(X3),
+        max1 = max(X1),
+        max2 = max(X2),
+        max3 = max(X3),
         #q1_25 = quantile(X1, .25),
         skew1 = e1071::skewness(X1),
         skew2 = e1071::skewness(X2),
@@ -102,23 +111,17 @@ Gyro_data = filenamesGYRO %>%
 
 Full_Test <- inner_join(Acc_data, Gyro_data)
 
-
-
-
-
 Full_Train %>%
-  ggplot(aes(m1_Gyro)) + 
+  ggplot(aes(p1_Acc)) + 
   geom_histogram(bins=40, fill=1, alpha=0.5) + 
-  geom_histogram(aes(m2_Gyro), bins=40, fill = 2, alpha=0.5) + 
-  geom_histogram(aes(m3_Gyro), bins=40, fill = 4, alpha=0.5) +
+  geom_histogram(aes(p2_Acc), bins=40, fill = 2, alpha=0.5) + 
+  geom_histogram(aes(p3_Acc), bins=40, fill = 4, alpha=0.5) +
   facet_wrap(~activity, scales = "free_y")
-
-
 
 #################################################################################
 # Models
 library(MASS)
-lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,21)])
+lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,30)])
 predicted <- predict(lda_test, Full_Test)
 summary(lda_test)
 Predicted <- as.vector(predicted$class)
