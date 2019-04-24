@@ -14,6 +14,25 @@ labels <- labels %>% mutate(activity = act_labels$X2[activity])
 
 train_labels = labels
 
+# Entropy function --------------------------------------------------------
+
+entropy  <- function(x, nbreaks = nclass.Sturges(x)) {
+  r = range(x)
+  x_binned = findInterval(x, seq(r[1], r[2], len= nbreaks))
+  h = tabulate(x_binned, nbins = nbreaks) # fast histogram
+  p = h/sum(h)
+  -sum(p[p>0] * log(p[p>0]))
+}
+
+# Spectrum function -------------------------------------------------------
+
+spect <- function(x) {
+  s <- spectrum(x, log='n', plot=F)
+  s$freq[which.max(s$spec)]
+}
+
+
+
 extractTimeDomainFeatures <- 
   function(filename, labels = train_labels) {
     # extract user and experimental run ID's from file name
@@ -93,6 +112,12 @@ extractTimeDomainFeatures <-
         AR21.1 = cor(X2, lag(X1), use = "pairwise"),
         AR31.1 = cor(X3, lag(X1), use = "pairwise"),
         AR32.1 = cor(X3, lag(X2), use = "pairwise"),
+        entr.1 = entropy(X1),
+        entr.2 = entropy(X2),
+        entr.3 = entropy(X3),
+        spec.1 = spect(X1),
+        spec.2 = spect(X2),
+        spec.3 = spect(X3),
         n=n()
       ) 
     
@@ -136,7 +161,17 @@ Full_Train %>%
 #################################################################################
 # Models
 library(MASS)
-lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,49)], CV = TRUE)
+lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)], CV = T)
+
+# Assess the accuracy of the prediction
+# percent correct for each category of G
+ct <- table(Full_Train$activity, lda_test$class)
+diag(prop.table(ct, 1))
+# total percent correct
+sum(diag(prop.table(ct)))
+
+
+lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)])
 predicted <- predict(lda_test, Full_Test)
 Predicted <- as.vector(predicted$class)
 
@@ -149,21 +184,5 @@ Full_Test %>%
 
 file.show("test_set_predictions.csv")
 
-Full_Test$activity <- as.vector(predicted$class)
-Full_Test %>%
-  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
-  unite(Id, user_id, exp_id, sample) %>%
-  dplyr::select(Id, Predicted = activity) %>%
-  write_csv("test_set_predictions_qda.csv")
-
-file.show("test_set_predictions_qda.csv")
-
-
-# Assess the accuracy of the prediction
-# percent correct for each category of G
-ct <- table(Full_Train$activity, lda_test$class)
-diag(prop.table(ct, 1))
-# total percent correct
-sum(diag(prop.table(ct)))
 
 
