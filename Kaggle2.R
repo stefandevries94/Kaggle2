@@ -50,12 +50,13 @@ extractTimeDomainFeatures <-
         exp_id = expname,   # added to identify experimental run in data frame rows
         activity = names(which.max(table(c("-", activity)))),
         sample = sample[1],
-        m1 = mean(X1), 
-        m2 = mean(X2),
-        m3 = mean(X3),
         p1 = mean(X1)^2,
         p2 = mean(X2)^2,
         p3 = mean(X3)^2,
+        p12 = mean(sqrt(X1^2 + X2^2))^2,
+        p13 = mean(sqrt(X1^2 + X3^2))^2,
+        p23 = mean(sqrt(X2^2 + X3^2))^2,
+        p123 = mean(sqrt(X1^2 + X2^2 + X3^2))^2,
         sd1 = sd(X1),
         sd2 = sd(X2),
         sd3 = sd(X3),
@@ -65,7 +66,15 @@ extractTimeDomainFeatures <-
         max1 = max(X1),
         max2 = max(X2),
         max3 = max(X3),
-        #q1_25 = quantile(X1, .25),
+        q1_25 = quantile(X1, .25),
+        q1_50 = quantile(X1, .50),
+        q1_75 = quantile(X1, .75),
+        q2_25 = quantile(X2, .25),
+        q2_50 = quantile(X2, .50),
+        q2_75 = quantile(X2, .75),
+        q3_25 = quantile(X3, .25),
+        q3_50 = quantile(X3, .50),
+        q3_75 = quantile(X3, .75),
         skew1 = e1071::skewness(X1),
         skew2 = e1071::skewness(X2),
         skew3 = e1071::skewness(X3),
@@ -75,14 +84,20 @@ extractTimeDomainFeatures <-
         AR2.2 = cor(X2, lag(X2, n = 2), use = "pairwise"),
         AR3.1 = cor(X3, lag(X3), use = "pairwise"),
         AR3.2 = cor(X3, lag(X3, n = 2), use = "pairwise"),
+        AR12 = cor(X1, X2, use = "pairwise"),
+        AR13 = cor(X1, X3, use = "pairwise"),
+        AR23 = cor(X2, X3, use = "pairwise"),
+        AR12.1 = cor(X1, lag(X2), use = "pairwise"),
+        AR13.1 = cor(X1, lag(X3), use = "pairwise"),
+        AR23.1 = cor(X2, lag(X3), use = "pairwise"),
+        AR21.1 = cor(X2, lag(X1), use = "pairwise"),
+        AR31.1 = cor(X3, lag(X1), use = "pairwise"),
+        AR32.1 = cor(X3, lag(X2), use = "pairwise"),
         n=n()
       ) 
     
     usertimedom 
   }
-
-filename = "physical-activity-recognition/RawData/Train/acc_exp01_user01.txt"
-extractTimeDomainFeatures(filename)
 
 filenamesACC <- dir("physical-activity-recognition/RawData/Train/", "^acc", full.names = TRUE)
 filenamesGYRO <- dir("physical-activity-recognition/RawData/Train/", "^gyro", full.names = TRUE)
@@ -112,20 +127,18 @@ Gyro_data = filenamesGYRO %>%
 Full_Test <- inner_join(Acc_data, Gyro_data)
 
 Full_Train %>%
-  ggplot(aes(p1_Acc)) + 
+  ggplot(aes(AR12_Acc)) + 
   geom_histogram(bins=40, fill=1, alpha=0.5) + 
-  geom_histogram(aes(p2_Acc), bins=40, fill = 2, alpha=0.5) + 
-  geom_histogram(aes(p3_Acc), bins=40, fill = 4, alpha=0.5) +
+  geom_histogram(aes(AR13_Acc), bins=40, fill = 2, alpha=0.5) + 
+  geom_histogram(aes(AR23_Acc), bins=40, fill = 4, alpha=0.5) +
   facet_wrap(~activity, scales = "free_y")
 
 #################################################################################
 # Models
 library(MASS)
-lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,30)])
+lda_test <- lda(activity ~ ., data = Full_Train[, -c(1:3,5,49)], CV = TRUE)
 predicted <- predict(lda_test, Full_Test)
-summary(lda_test)
 Predicted <- as.vector(predicted$class)
-
 
 Full_Test$activity <-  as.vector(predicted$class)
 Full_Test %>%
@@ -135,3 +148,22 @@ Full_Test %>%
   write_csv("test_set_predictions.csv")
 
 file.show("test_set_predictions.csv")
+
+Full_Test$activity <- as.vector(predicted$class)
+Full_Test %>%
+  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
+  unite(Id, user_id, exp_id, sample) %>%
+  dplyr::select(Id, Predicted = activity) %>%
+  write_csv("test_set_predictions_qda.csv")
+
+file.show("test_set_predictions_qda.csv")
+
+
+# Assess the accuracy of the prediction
+# percent correct for each category of G
+ct <- table(Full_Train$activity, lda_test$class)
+diag(prop.table(ct, 1))
+# total percent correct
+sum(diag(prop.table(ct)))
+
+
