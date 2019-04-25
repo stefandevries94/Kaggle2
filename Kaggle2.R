@@ -1,7 +1,9 @@
 library(tidyverse)
-library(MASS)
 
 dir("physical-activity-recognition/RawData/Train/", pattern = "^acc")
+
+
+# Extract data labels -----------------------------------------------------
 
 act_labels <- read_delim("physical-activity-recognition/activity_labels.txt", " ", col_names=F, trim_ws = T) 
 act_labels = act_labels %>% dplyr::select("X1","X2")
@@ -13,6 +15,7 @@ labels <- labels %>% mutate(activity = act_labels$X2[activity])
 
 train_labels = labels
 
+
 # Entropy function --------------------------------------------------------
 
 entropy  <- function(x, nbreaks = nclass.Sturges(x)) {
@@ -23,13 +26,13 @@ entropy  <- function(x, nbreaks = nclass.Sturges(x)) {
   -sum(p[p>0] * log(p[p>0]))
 }
 
+
 # Spectrum function -------------------------------------------------------
 
 spect <- function(x) {
   s <- spectrum(x, log='n', plot=F)
   s$freq[which.max(s$spec)]
 }
-
 
 
 # Function for extracting time domain features ----------------------------
@@ -155,6 +158,9 @@ Gyro_data = filenamesGYRO %>%
 
 Full_Test <- inner_join(Acc_data, Gyro_data)
 
+
+# Visualisation -----------------------------------------------------------
+
 Full_Train %>%
   ggplot(aes(AR12_Acc)) + 
   geom_histogram(bins=40, fill=1, alpha=0.5) + 
@@ -163,8 +169,8 @@ Full_Train %>%
   facet_wrap(~activity, scales = "free_y")
 
 
-
 # Model -------------------------------------------------------------------
+library(MASS)
 # model test with CV
 lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)], CV = T)
 
@@ -178,6 +184,8 @@ sum(diag(prop.table(ct)))
 
 # Final model
 lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)])
+
+# Make predictions
 predicted <- predict(lda_test, Full_Test)
 
 Full_Test$activity <-  as.vector(predicted$class)
@@ -188,6 +196,3 @@ Full_Test %>%
   write_csv("test_set_predictions.csv")
 
 file.show("test_set_predictions.csv")
-
-
-
