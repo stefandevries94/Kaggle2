@@ -103,13 +103,16 @@ extractTimeDomainFeatures <-
         AR13.2 = cor(X1, lag(X3, n = 2), use = "pairwise"),
         AR23.1 = cor(X2, lag(X3), use = "pairwise"),
         AR23.2 = cor(X2, lag(X3, n = 2), use = "pairwise"),
-        n=n(),
+        C12 = cor(X1, X2, use = "pairwise"),
+        C13 = cor(X1, X3, use = "pairwise"),
+        C23 = cor(X1, X2, use = "pairwise"),
         entr.1 = entropy(X1),
         entr.2 = entropy(X2),
         entr.3 = entropy(X3),
         spec.1 = spect(X1),
         spec.2 = spect(X2),
-        spec.3 = spect(X3)
+        spec.3 = spect(X3),
+        n=n()
       ) 
     
     usertimedom 
@@ -174,35 +177,84 @@ data_train <- data_train %>%
 data_test <- data_test %>% 
   mutate_if(is.character, as.factor)
 
-data_train[,-1]
-
-### caret
-qda_fit <- train(activity ~ ., data = data_train[,-1], method = "stepQDA")
+### simple LDA
+lda_test <- lda(activity ~ . + m1_Acc * m1_Gyro + m2_Acc * m2_Gyro + m3_Acc * m3_Gyro, data = data_train[, -c(1:3,5,45)])
 
 
+### prediction
+predicted <- predict(lda_test, data_test)
+
+data_test$activity <-  as.vector(predicted$class)
+data_test %>%
+  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
+  unite(Id, user_id, exp_id, sample) %>%
+  dplyr::select(Id, Predicted = activity) %>%
+  write_csv("test_set_predictions_12.csv")
+
+file.show("test_set_predictions_12.csv")
 
 
 
 
 
+# naive bayes -------------------------------------------------------------
+
+search_grid <- expand.grid(
+  usekernel = c(TRUE, FALSE),
+  fL = 0:5,
+  adjust = seq(0, 5, by = 1)
+)
+
+nb_model = train(activity ~ ., 
+                 data = data_train[, -c(1:3, 5, 36)], 
+                 method = "nb",
+                 trControl = trainControl(method='cv',number=10),
+                 tuneGrid = search_grid,
+                 preProc = c("BoxCox", "center", "scale", "pca")
+                 )
 
 
+confusionMatrix(nb_model)
+
+predicted <- predict(nb_model, data_test)
+Predicted <- as.vector(predicted)
+
+
+data_test$activity <- as.vector(predicted) %>% c(sample(predicted, 1))
+
+data_test %>%
+  mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
+  unite(Id, user_id, exp_id, sample) %>%
+  dplyr::select(Id, Predicted = activity) %>%
+  write_csv("test_set_predictions_nb_2.csv")
 
 
 
 ##### QDA
-qda_test <- qda(activity ~ ., data = data_train[, -1])
-predicted <- predict(qda_test, data_test)
-summary(qda_test)
+data_lda <- data_train %>% 
+  dplyr::select(-c(epoch:exp_id, sample, n))
+
+data_lda_test <- data_test %>% 
+  dplyr::select(-c(epoch:exp_id, sample, n))
+
+
+lda_test <- lda(activity ~ ., data = data_lda)
+
+predicted <- predict(lda_test, new=data_lda_test)
+summary(lda_test)
 Predicted <- as.vector(predicted$class)
 
 
-Full_Test$activity <- as.vector(predicted$class)
-Full_Test %>%
+data_test$activity <- as.vector(predicted$class)
+data_test %>%
   mutate(user_id = paste("user", user_id, sep=""), exp_id = paste("exp", exp_id, sep="")) %>%
   unite(Id, user_id, exp_id, sample) %>%
   dplyr::select(Id, Predicted = activity) %>%
-  write_csv("test_set_predictions_qda.csv")
+  write_csv("test_set_predictions_8.csv")
 
 file.show("test_set_predictions.csv")
+
+
+
+
 
