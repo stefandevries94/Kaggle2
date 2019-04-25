@@ -1,6 +1,5 @@
-setwd("~/Documents/Behavioral Data Science/BDA/Kaggle 2")
-
 library(tidyverse)
+library(MASS)
 
 dir("physical-activity-recognition/RawData/Train/", pattern = "^acc")
 
@@ -32,6 +31,8 @@ spect <- function(x) {
 }
 
 
+
+# Function for extracting time domain features ----------------------------
 
 extractTimeDomainFeatures <- 
   function(filename, labels = train_labels) {
@@ -72,7 +73,7 @@ extractTimeDomainFeatures <-
         p1 = mean(X1)^2,
         p2 = mean(X2)^2,
         p3 = mean(X3)^2,
-        p12 = mean(sqrt(X1^2 + X2^2))^2,
+        p12 = mean(sqrt(X1^2 + X2^2))^2, # calculate euclidean distance using pythagorus 
         p13 = mean(sqrt(X1^2 + X3^2))^2,
         p23 = mean(sqrt(X2^2 + X3^2))^2,
         p123 = mean(sqrt(X1^2 + X2^2 + X3^2))^2,
@@ -124,6 +125,9 @@ extractTimeDomainFeatures <-
     usertimedom 
   }
 
+
+# Importing data with the function ----------------------------------------
+
 filenamesACC <- dir("physical-activity-recognition/RawData/Train/", "^acc", full.names = TRUE)
 filenamesGYRO <- dir("physical-activity-recognition/RawData/Train/", "^gyro", full.names = TRUE)
 
@@ -158,22 +162,23 @@ Full_Train %>%
   geom_histogram(aes(AR23_Acc), bins=40, fill = 4, alpha=0.5) +
   facet_wrap(~activity, scales = "free_y")
 
-#################################################################################
-# Models
-library(MASS)
+
+
+# Model -------------------------------------------------------------------
+# model test with CV
 lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)], CV = T)
 
 # Assess the accuracy of the prediction
-# percent correct for each category of G
+# percent correct for each category of activity
 ct <- table(Full_Train$activity, lda_test$class)
 diag(prop.table(ct, 1))
 # total percent correct
 sum(diag(prop.table(ct)))
 
 
+# Final model
 lda_test <- lda(activity ~ . + p1_Acc * p1_Gyro + p2_Acc * p2_Gyro + p3_Acc * p3_Gyro, data = Full_Train[, -c(1:3,5,55)])
 predicted <- predict(lda_test, Full_Test)
-Predicted <- as.vector(predicted$class)
 
 Full_Test$activity <-  as.vector(predicted$class)
 Full_Test %>%
